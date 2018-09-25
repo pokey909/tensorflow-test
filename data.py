@@ -40,8 +40,8 @@ def ndarray_to_tfrecords(X, Y, file_path, verbose=True):
 			return lambda array: tf.train.Feature(float_list=tf.train.FloatList(value=array))
 		elif dtype_ == np.int64:
 			return lambda array: tf.train.Feature(int64_list=tf.train.Int64List(value=array))
-		elif dtype_ == np.uint8:
-			return lambda array: tf.train.Feature(bytes_list=tf.train.BytesList(value=array))
+		elif dtype_ == np.int32:
+			return lambda array: tf.train.Feature(int64_list=tf.train.Int64List(value=array))
 		else:
 			raise ValueError("The input should be numpy ndarray. Instead got {}".format(ndarray.dtype))
 	

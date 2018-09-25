@@ -72,58 +72,6 @@ def piece_index(piece):
     elif piece == chess.Piece(chess.KING, chess.BLACK):
         return Const.X_black_king
 
-def extract_position_feature(board, forPiece):
-    if board.turn != chess.WHITE:
-        raise ValueError("Features should be extracted from " +
-                         "a board with white perspective")
-
-    if K.image_data_format() == 'channels_first':
-        X = np.zeros((Const.NUMFEATURES, 8, 8), dtype=int32)  # Channel first!
-    elif K.image_dim_ordering() == "tf":
-        X = np.zeros((8, 8, Const.NUMFEATURES), dtype=int32)  # Channel last!
-    else:
-        raise ValueError("Dim ordering not understood (nor tf nor th)!")
-
-    for i in range(8):
-        for j in range(8):
-
-            piece = board.piece_at(chess.square(i, j))
-
-            if K.image_dim_ordering() == "tf":
-
-                # position and moves
-                X[i, j, piece_index(piece)] = 1
-                # if piece == chess.Piece(chess.PAWN, chess.WHITE):
-                #     X[i, j, Const.X_white_pawns] = 1
-                # elif piece == chess.Piece(chess.KNIGHT, chess.WHITE):
-                #     X[i, j, Const.X_white_knights] = 1
-                # elif piece == chess.Piece(chess.BISHOP, chess.WHITE):
-                #     X[i, j, Const.X_white_bishops] = 1
-                # elif piece == chess.Piece(chess.ROOK, chess.WHITE):
-                #     X[i, j, Const.X_white_rooks] = 1
-                # elif piece == chess.Piece(chess.QUEEN, chess.WHITE):
-                #     X[i, j, Const.X_white_queens] = 1
-                # elif piece == chess.Piece(chess.KING, chess.WHITE):
-                #     X[i, j, Const.X_white_king] = 1
-                # elif piece == chess.Piece(chess.PAWN, chess.BLACK):
-                #     X[i, j, Const.X_black_pawns] = 1
-                # elif piece == chess.Piece(chess.KNIGHT, chess.BLACK):
-                #     X[i, j, Const.X_black_knights] = 1
-                # elif piece == chess.Piece(chess.BISHOP, chess.BLACK):
-                #     X[i, j, Const.X_black_bishops] = 1
-                # elif piece == chess.Piece(chess.ROOK, chess.BLACK):
-                #     X[i, j, Const.X_black_rooks] = 1
-                # elif piece == chess.Piece(chess.QUEEN, chess.BLACK):
-                #     X[i, j, Const.X_black_queens] = 1
-                # elif piece == chess.Piece(chess.KING, chess.BLACK):
-                #     X[i, j, Const.X_black_king] = 1
-            # else
-            #     raise ValueError("Theano dimension ordering to be updated")
-            #     # STOP!
-            #     exit(1)
-
-    return np.squeeze(X[:,:,piece_index(forPiece)])
-
 def extract_features(board):
 
     if board.turn != chess.WHITE:
@@ -228,5 +176,4 @@ def extract_features(board):
                 elif piece == chess.Piece(chess.KING, chess.BLACK):
                     X[Const.X_black_king, i, j] = 1
                 #else:
-
     return X

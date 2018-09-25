@@ -8,6 +8,7 @@ import random
 import data
 import numpy as np
 import Const
+import chess.pgn
 
 FLAGS = None
 
@@ -17,42 +18,76 @@ def _int64_feature(value):
 def _bytes_feature(value):
     return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
 
-# [Squares[1..64]]
-def boardToVector(initialPosition, legalMovesBoard):
-    features = fe.extract_features(initialPosition)
-    feature = {
-        'train/label': _int64_feature(1),
-        'train/feature': _int64_feature(builder)
-    }
-
-    return builder
-
-# Squares[1..64], side_to_move, player_color
-def boardToString(board):
-    return ",".join(map(str, boardToVector(board)))
+# def saveExample(features):
+#     X_flat = np.reshape(X, [X.shape[0], np.prod(X.shape[1:])])
 
 def setupBoards(fen, pieceToMove):
     boards = []
+    pgn = open('Ashley.pgn')
     
-    initialBoard = chess.Board(fen=fen, chess960=False)
-    pieceSquares = initialBoard.pieces(pieceToMove.piece_type, pieceToMove.color)
-    if len(pieceSquares) == 0:
-        print("PieceToMove not on the board. Adding it...")
-        initialBoard.set_piece_at(chess.A1, pieceToMove)
-        pieceSquares.add(chess.A1)
+    initialBoards=[]
+    g = chess.pgn.read_game(pgn)
+    b = chess.Board()
+    initialBoards.append(b)
+    for move in g.main_line():
+        b.push(move)
+        b.turn = pieceToMove.color
+        initialBoards.append(chess.Board(b.fen()))
 
-    for pieceSquare in pieceSquares:
-        board = initialBoard
-        board.remove_piece_at(pieceSquare)
-        freeSquares = ~chess.SquareSet(board.occupied)
-        for i in freeSquares:
-            board = chess.Board(fen=fen, chess960=False)
-            board.set_piece_at(i, pieceToMove)
-            board.turn = pieceToMove.color
-            boards.append(board)
+    for game in initialBoards:
+        print(game)
+        if game == None:
+            initialBoard = chess.Board(fen=fen, chess960=False)
+        else:
+            initialBoard = game
+        pieceSquares = initialBoard.pieces(pieceToMove.piece_type, pieceToMove.color)
+        if len(pieceSquares) == 0:        
+            print(chess.PIECE_NAMES[pieceToMove.piece_type] + " not on the board. Adding it...")
+            free = np.random.choice(list(~chess.SquareSet(initialBoard.occupied)))
+            initialBoard.set_piece_at(free, pieceToMove)
+            pieceSquares.add(free)
+
+        # print(pieceToMove)
+        # print(pieceSquares)
+        for pieceSquare in pieceSquares:
+            board = initialBoard
+            freeSquares = ~chess.SquareSet(board.occupied)
+            for i in freeSquares:
+                board = initialBoard
+                board.remove_piece_at(pieceSquare)
+                board.set_piece_at(i, pieceToMove)
+                board.turn = pieceToMove.color
+                boards.append(board)
     return boards
 
-def allMovesForPiece(features, pieceToMove):
+def npy_to_tfrecords(x, y, output_file):
+    # write records to a tfrecords file
+    writer = tf.python_io.TFRecordWriter(output_file)
+
+    for i in range(x.shape[0]):
+        # Feature contains a map of string to feature proto objects
+        X = np.squeeze(x[i,:,:,:])
+        Y = np.squeeze(y[i,:,:,:])
+
+        feature = {}
+        feature['X'] = _bytes_feature(tf.compat.as_bytes(X.tostring()))
+        feature['Y'] = _bytes_feature(tf.compat.as_bytes(Y.tostring()))
+        feature['width'] = _int64_feature(X.shape[0])
+        feature['height'] = _int64_feature(X.shape[1])
+        feature['planes'] = _int64_feature(X.shape[2])
+        
+        # Construct the Example proto object
+        example = tf.train.Example(features=tf.train.Features(feature=feature))
+
+        # Serialize the example to a string
+        serialized = example.SerializeToString()
+
+        # write the serialized objec to the disk
+        writer.write(serialized)
+    writer.close()
+
+def allMovesForPiece(pieceToMove):
+    
     boards = setupBoards(None, pieceToMove)
     features = None
     shapeKnown = False
@@ -61,14 +96,14 @@ def allMovesForPiece(features, pieceToMove):
     for b in boards:
         f = fe.extract_features(b)
         if not shapeKnown:
-            features = np.zeros(shape=(len(boards),) + f.shape)
+            features = np.zeros(shape=(len(boards),) + f.shape, dtype=f.dtype)
             shapeKnown = True
-        features[index] = f
+        features[index,:,:,:] = f
         index = index + 1
 
     positions = features[:, :, :, 0:(Const.X_black_king + 1)]
     moves = features[:,:,:,Const.X_white_pawns_moves:(Const.X_white_king_moves + 1)]
-    data.ndarray_to_tfrecords(positions, moves, chess.PIECE_NAMES[pieceToMove.piece_type] + ".tfrecord")
+    npy_to_tfrecords(positions, moves, chess.PIECE_NAMES[pieceToMove.piece_type] + ".tfrecord")
 
 for pt in chess.PIECE_TYPES:
-    allMovesForPiece(None, chess.Piece(pt, chess.WHITE))
+    allMovesForPiece(chess.Piece(pt, chess.WHITE))

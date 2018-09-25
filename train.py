@@ -1,63 +1,106 @@
 import tensorflow as tf
 import numpy as np
+import matplotlib.pyplot as plt
+import chess
 
-def load_data():
-    # Transforms a scalar string `example_proto` into a pair of a scalar string and
-    # a scalar integer, representing an image and its label, respectively.
-    def _parse_function(example_proto):
-        #   features = {"train/label": tf.FixedLenFeature((), tf.string, default_value=""),
-        #               "train/feature": tf.FixedLenFeature((), tf.int32, default_value=0)}
-        features={
-            'X': tf.FixedLenFeature((), tf.int64, default_value=tf.zeros([], dtype=tf.int64)),
-            'x_shape': tf.FixedLenFeature((), tf.int64, default_value=tf.zeros([], dtype=tf.int64)),
-            'Y': tf.FixedLenFeature((), tf.int64, default_value=tf.zeros([], dtype=tf.int64)),
-            'y_shape': tf.FixedLenFeature((), tf.int64, default_value=tf.zeros([], dtype=tf.int64))
-        }              
-        # example = tf.train.Example()
-        # example.ParseFromString(example_proto)
-        parsed = tf.parse_single_example(example_proto, features)
-                
-        X = tf.reshape(parsed["X"], (8,8,12))
-        Y = tf.reshape(parsed["Y"], (8,8,12))
-        return {"positions": X}, {"moves": Y}
-
-    # Creates a dataset that reads all of the examples from two files.
-    filenames = ["king.tfrecord"]
-    dat = tf.data.TFRecordDataset(filenames).map(_parse_function).shuffle(buffer_size=10000).repeat(10).batch(32)
-
-    iterator = dat.make_one_shot_iterator()
-
-    # # `features` is a dictionary in which each value is a batch of values for
-    # # that feature; `labels` is a batch of labels.
-    # features, labels = iterator.get_next()
-    return iterator
+# def read_and_decode(filename_queue):
+#   reader = tf.TFRecordReader()
+#   _, serialized_example = reader.read(filename_queue)
+#   features = tf.parse_single_example(
+#       serialized_example,
+#       # Defaults are not specified since both keys are required.
+#       features={
+#           'image_raw': tf.FixedLenFeature([], tf.string),
+#           'label': tf.FixedLenFeature([], tf.int64),
+#           'height': tf.FixedLenFeature([], tf.int64),
+#           'width': tf.FixedLenFeature([], tf.int64),
+#           'depth': tf.FixedLenFeature([], tf.int64)
+#       })
+#   image = tf.decode_raw(features['image_raw'], tf.uint8)
+#   label = tf.cast(features['label'], tf.int32)
+#   height = tf.cast(features['height'], tf.int32)
+#   width = tf.cast(features['width'], tf.int32)
+#   depth = tf.cast(features['depth'], tf.int32)
+#   return image, label, height, width, depth
 
 
+# with tf.Session() as sess:
+#   filename_queue = tf.train.string_input_producer(["../data/svhn/svhn_train.tfrecords"])
+#   image, label, height, width, depth = read_and_decode(filename_queue)
+#   image = tf.reshape(image, tf.pack([height, width, 3]))
+#   image.set_shape([32,32,3])
+#   init_op = tf.initialize_all_variables()
+#   sess.run(init_op)
+#   coord = tf.train.Coordinator()
+#   threads = tf.train.start_queue_runners(coord=coord)
+#   for i in range(1000):
+#     example, l = sess.run([image, label])
+#     print (example,l)
+#   coord.request_stop()
+#   coord.join(threads)
 
-for serialized_example in tf.python_io.tf_record_iterator("king.tfrecord"):
-    example = tf.train.Example()
-    example.ParseFromString(serialized_example)
-    x_1 = np.array(example.features.feature["X"].float_list.value)
-    s_x = np.array(example.features.feature["x_shape"].int64_list.value)
-    y_1 = np.array(example.features.feature["Y"].float_list.value)
-    s_y = np.array(example.features.feature["y_shape"].int64_list.value)
+def load_data(session, fq):
+    reader = tf.TFRecordReader()
+    _, serialized_example = reader.read(fq)
+    features={
+        'X': tf.FixedLenFeature([], tf.string),
+        'Y': tf.FixedLenFeature([], tf.string),
+        'width': tf.FixedLenFeature([], tf.int64),
+        'height': tf.FixedLenFeature([], tf.int64),
+        'planes': tf.FixedLenFeature([], tf.int64)
+    }              
+    parsed = tf.parse_single_example(serialized_example, features=features)
+    X = tf.decode_raw(parsed['X'], tf.int64)
+    Y = tf.decode_raw(parsed['Y'], tf.int64)
+    # w, h, planes = sess.run([parsed['width'], parsed['height'], parsed['planes']])
+
+    X = tf.reshape(X, [8, 8, 12])
+    Y = tf.reshape(Y, [8, 8, 6])
+
+    X, Y = tf.train.shuffle_batch([X, Y], batch_size=10, capacity=30, num_threads=1, min_after_dequeue=10)
+    # X = tf.reshape(X, tf.stack([8,8,6]))
+    # X = tf.reshape(X, [8,8,12])
+    # Y = tf.reshape(Y, tf.stack([8,8,6]))
+    return X, Y
+
+
+config = tf.ConfigProto(
+        device_count = {'GPU': 0}
+    )
+with tf.Session(config=config)  as sess:
+
+    filename = "bishop.tfrecord"
+    filename_queue = tf.train.string_input_producer([filename], num_epochs=40)
+    x,y = load_data(sess, filename_queue)
+
+   # Initialize all global and local variables
+    init_op = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
+    sess.run(init_op)
+    # Create a coordinator and run all QueueRunner objects
+    coord = tf.train.Coordinator()
+    threads = tf.train.start_queue_runners(coord=coord)
+    for ep in range(6):
+        for batch_index in range(10):
+            X, Y = sess.run([x, y])
+            Y = Y.astype(np.uint8)
+            for j in range(18):
+                idx = (j % 6) + 1
+                plt.subplot(6, 3, j+1)
+                plt.subplots_adjust(hspace=0.5)
+                piece = chess.PIECE_NAMES[idx]
+                if j < 6:
+                    plt.imshow(Y[batch_index, :,:,j].T)
+                else:
+                    plt.imshow(X[batch_index, :,:,j - 6].T, cmap='summer')
+                plt.xticks(np.arange(8), ('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'))
+                plt.yticks(np.arange(8), np.arange(1, 9))
+                plt.title(piece)
+                plt.gca().invert_yaxis()
+            plt.draw()
+            plt.waitforbuttonpress(0)
+    # Stop the threads
+    coord.request_stop()
     
-    x_1 = np.reshape(x_1, s_x)
-    print("First restored example:\n", x_1)
-    print("shape of X:", s_x)
-
-    y_1 = np.reshape(y_1, s_y)
-    print("First restored label:\n", y_1)
-    print("shape of Y", s_y)
-
-iterator = load_data()
-
-with tf.Session()  as sess:
-    # Compute for 100 epochs.
-    for _ in range(100):
-        # sess.run(iterator.initializer)
-        while True:
-            try:
-                sess.run(iterator.get_next())
-            except tf.errors.OutOfRangeError:
-                break
+    # Wait for threads to stop
+    coord.join(threads)
+    sess.close()
