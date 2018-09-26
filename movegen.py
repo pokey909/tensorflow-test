@@ -28,39 +28,38 @@ def setupBoards(fen, pieceToMove):
     initialBoards=[]
     g = chess.pgn.read_game(pgn)
     b = chess.Board()
-    initialBoards.append(b)
+    initialBoards.append(chess.Board())
     for move in g.main_line():
         b.push(move)
-        b.turn = pieceToMove.color
+        # b.turn = pieceToMove.color
         initialBoards.append(chess.Board(b.fen()))
 
-    for game in initialBoards:
-        print(game)
-        if game == None:
-            initialBoard = chess.Board(fen=fen, chess960=False)
-        else:
-            initialBoard = game
-        pieceSquares = initialBoard.pieces(pieceToMove.piece_type, pieceToMove.color)
-        if len(pieceSquares) == 0:        
-            print(chess.PIECE_NAMES[pieceToMove.piece_type] + " not on the board. Adding it...")
-            free = np.random.choice(list(~chess.SquareSet(initialBoard.occupied)))
-            initialBoard.set_piece_at(free, pieceToMove)
-            pieceSquares.add(free)
+    # for game in initialBoards:
+    #     if game == None:
+    #         initialBoard = chess.Board(fen=fen, chess960=False)
+    #     else:
+    #         initialBoard = game
+    #     if len(pieceSquares) == 0:        
+    #         print(chess.PIECE_NAMES[pieceToMove.piece_type] + " not on the board. skipping position...")
+    #         # free = np.random.choice(list(~chess.SquareSet(initialBoard.occupied)))
+    #         # initialBoard.set_piece_at(free, pieceToMove)
+    #         # pieceSquares.add(free)
 
-        # print(pieceToMove)
-        # print(pieceSquares)
-        for pieceSquare in pieceSquares:
-            board = initialBoard
-            freeSquares = ~chess.SquareSet(board.occupied)
-            for i in freeSquares:
-                board = initialBoard
-                board.remove_piece_at(pieceSquare)
-                board.set_piece_at(i, pieceToMove)
-                board.turn = pieceToMove.color
-                boards.append(board)
-    return boards
+    #     # print(pieceToMove)
+    #     # print(pieceSquares)
+    #     for pieceSquare in pieceSquares:
+    #         board = chess.Board(initialBoard.fen())
+    #         freeSquares = ~chess.SquareSet(board.occupied)
+    #         for i in freeSquares:
+    #             board = initialBoard
+    #             board.remove_piece_at(pieceSquare)
+    #             board.set_piece_at(i, pieceToMove)
+    #             board.turn = pieceToMove.color
+    #             boards.append(board)
+    # return boards
+    return initialBoards
 
-def npy_to_tfrecords(x, y, output_file):
+def npy_to_tfrecords(x, y, boards, output_file):
     # write records to a tfrecords file
     writer = tf.python_io.TFRecordWriter(output_file)
 
@@ -75,7 +74,7 @@ def npy_to_tfrecords(x, y, output_file):
         feature['width'] = _int64_feature(X.shape[0])
         feature['height'] = _int64_feature(X.shape[1])
         feature['planes'] = _int64_feature(X.shape[2])
-        
+        feature['fen'] = _bytes_feature(tf.compat.as_bytes(boards[i].fen()))
         # Construct the Example proto object
         example = tf.train.Example(features=tf.train.Features(feature=feature))
 
@@ -103,7 +102,7 @@ def allMovesForPiece(pieceToMove):
 
     positions = features[:, :, :, 0:(Const.X_black_king + 1)]
     moves = features[:,:,:,Const.X_white_pawns_moves:(Const.X_white_king_moves + 1)]
-    npy_to_tfrecords(positions, moves, chess.PIECE_NAMES[pieceToMove.piece_type] + ".tfrecord")
+    npy_to_tfrecords(positions, moves, boards, chess.PIECE_NAMES[pieceToMove.piece_type] + ".tfrecord")
 
 for pt in chess.PIECE_TYPES:
     allMovesForPiece(chess.Piece(pt, chess.WHITE))

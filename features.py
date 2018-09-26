@@ -32,12 +32,14 @@ def bitCount(int_type): # TODO: optimize with chess.popcount
     return (count)
 
 
-def addMoves(X, board, i, j, f, blackpiece=False):
-    if blackpiece: board.turn = chess.BLACK
-    for m in board.generate_legal_moves():
+def addMoves(X, moves, turn, i, j, f, blackpiece=False):
+    # if blackpiece: 
+    #     board.turn = chess.BLACK
+    for m in moves:
         if chess.square(i, j) == m.from_square:
             X[m.to_square % 8, int(m.to_square / 8), f] += 1
-    if blackpiece: board.turn = chess.WHITE
+    # if blackpiece: 
+    #     board.turn = chess.WHITE
 
 
 def addCrown(X, board, i, j, f):
@@ -46,37 +48,12 @@ def addCrown(X, board, i, j, f):
             if 0 <= (i + x) <= 7 and 0 <= (j + y) <= 7:
                 X[i + x, j + y, f] = 1
 
-def piece_index(piece):
-    if piece == chess.Piece(chess.PAWN, chess.WHITE):
-        return Const.X_white_pawns
-    elif piece == chess.Piece(chess.KNIGHT, chess.WHITE):
-        return Const.X_white_knights
-    elif piece == chess.Piece(chess.BISHOP, chess.WHITE):
-        return Const.X_white_bishops
-    elif piece == chess.Piece(chess.ROOK, chess.WHITE):
-        return Const.X_white_rooks
-    elif piece == chess.Piece(chess.QUEEN, chess.WHITE):
-        return Const.X_white_queens
-    elif piece == chess.Piece(chess.KING, chess.WHITE):
-        return Const.X_white_king
-    elif piece == chess.Piece(chess.PAWN, chess.BLACK):
-        return Const.X_black_pawns
-    elif piece == chess.Piece(chess.KNIGHT, chess.BLACK):
-        return Const.X_black_knights
-    elif piece == chess.Piece(chess.BISHOP, chess.BLACK):
-        return Const.X_black_bishops
-    elif piece == chess.Piece(chess.ROOK, chess.BLACK):
-        return Const.X_black_rooks
-    elif piece == chess.Piece(chess.QUEEN, chess.BLACK):
-        return Const.X_black_queens
-    elif piece == chess.Piece(chess.KING, chess.BLACK):
-        return Const.X_black_king
 
 def extract_features(board):
 
     if board.turn != chess.WHITE:
-        raise ValueError("Features should be extracted from " +
-                         "a board with white perspective")
+        board.turn = chess.WHITE
+        # raise ValueError("Features should be extracted from " + "a board with white perspective")
 
     if K.image_data_format() == 'channels_first':
         X = np.zeros((Const.NUMFEATURES, 8, 8), dtype=np.int64)  # Channel first!
@@ -92,47 +69,47 @@ def extract_features(board):
         for j in range(8):
 
             piece = board.piece_at(chess.square(i, j))
-
+            moves = board.generate_legal_moves()
             if K.image_data_format() == 'channels_last':
 
                 # position and moves
                 if piece == chess.Piece(chess.PAWN, chess.WHITE):
                     X[i, j, Const.X_white_pawns] = 1
-                    addMoves(X, board, i, j, Const.X_white_pawns_moves)
+                    addMoves(X, moves, board.turn,  i, j, Const.X_white_pawns_moves)
                 elif piece == chess.Piece(chess.KNIGHT, chess.WHITE):
                     X[i, j, Const.X_white_knights] = 1
-                    addMoves(X, board, i, j, Const.X_white_knights_moves)
+                    addMoves(X, moves, board.turn,  i, j, Const.X_white_knights_moves)
                 elif piece == chess.Piece(chess.BISHOP, chess.WHITE):
                     X[i, j, Const.X_white_bishops] = 1
-                    addMoves(X, board, i, j, Const.X_white_bishops_moves)
+                    addMoves(X, moves, board.turn,  i, j, Const.X_white_bishops_moves)
                 elif piece == chess.Piece(chess.ROOK, chess.WHITE):
                     X[i, j, Const.X_white_rooks] = 1
-                    addMoves(X, board, i, j, Const.X_white_rooks_moves)
+                    addMoves(X, moves, board.turn,  i, j, Const.X_white_rooks_moves)
                 elif piece == chess.Piece(chess.QUEEN, chess.WHITE):
                     X[i, j, Const.X_white_queens] = 1
-                    addMoves(X, board, i, j, Const.X_white_queens_moves)
+                    addMoves(X, moves, board.turn,  i, j, Const.X_white_queens_moves)
                 elif piece == chess.Piece(chess.KING, chess.WHITE):
                     X[i, j, Const.X_white_king] = 1
-                    addMoves(X, board, i, j, Const.X_white_king_moves)
+                    addMoves(X, moves, board.turn,  i, j, Const.X_white_king_moves)
                     addCrown(X, board, i, j, Const.X_white_king_crown)
                 elif piece == chess.Piece(chess.PAWN, chess.BLACK):
                     X[i, j, Const.X_black_pawns] = 1
-                    addMoves(X, board, i, j, Const.X_black_pawns_moves, True)
+                    addMoves(X, moves, board.turn,  i, j, Const.X_black_pawns_moves, True)
                 elif piece == chess.Piece(chess.KNIGHT, chess.BLACK):
                     X[i, j, Const.X_black_knights] = 1
-                    addMoves(X, board, i, j, Const.X_black_knights_moves, True)
+                    addMoves(X, moves, board.turn,  i, j, Const.X_black_knights_moves, True)
                 elif piece == chess.Piece(chess.BISHOP, chess.BLACK):
                     X[i, j, Const.X_black_bishops] = 1
-                    addMoves(X, board, i, j, Const.X_black_bishops_moves, True)
+                    addMoves(X, moves, board.turn,  i, j, Const.X_black_bishops_moves, True)
                 elif piece == chess.Piece(chess.ROOK, chess.BLACK):
                     X[i, j, Const.X_black_rooks] = 1
-                    addMoves(X, board, i, j, Const.X_black_rooks_moves, True)
+                    addMoves(X, moves, board.turn,  i, j, Const.X_black_rooks_moves, True)
                 elif piece == chess.Piece(chess.QUEEN, chess.BLACK):
                     X[i, j, Const.X_black_queens] = 1
-                    addMoves(X, board, i, j, Const.X_black_queens_moves, True)
+                    addMoves(X, moves, board.turn,  i, j, Const.X_black_queens_moves, True)
                 elif piece == chess.Piece(chess.KING, chess.BLACK):
                     X[i, j, Const.X_black_king] = 1
-                    addMoves(X, board, i, j, Const.X_black_king_moves, True)
+                    addMoves(X, moves, board.turn,  i, j, Const.X_black_king_moves, True)
                     addCrown(X, board, i, j, Const.X_black_king_crown)
 
                 # attackers
@@ -151,29 +128,4 @@ def extract_features(board):
                 raise ValueError("Theano dimension ordering to be updated")
                 # STOP!
                 exit(1)
-                if piece == chess.Piece(chess.PAWN, chess.WHITE):
-                    X[Const.X_white_pawns, i, j] = 1
-                elif piece == chess.Piece(chess.KNIGHT, chess.WHITE):
-                    X[Const.X_white_knights, i, j] = 1
-                elif piece == chess.Piece(chess.BISHOP, chess.WHITE):
-                    X[Const.X_white_bishops, i, j] = 1
-                elif piece == chess.Piece(chess.ROOK, chess.WHITE):
-                    X[Const.X_white_rooks, i, j] = 1
-                elif piece == chess.Piece(chess.QUEEN, chess.WHITE):
-                    X[Const.X_white_queens, i, j] = 1
-                elif piece == chess.Piece(chess.KING, chess.WHITE):
-                    X[Const.X_white_king, i, j] = 1
-                elif piece == chess.Piece(chess.PAWN, chess.BLACK):
-                    X[Const.X_black_pawns, i, j] = 1
-                elif piece == chess.Piece(chess.KNIGHT, chess.BLACK):
-                    X[Const.X_black_knights, i, j] = 1
-                elif piece == chess.Piece(chess.BISHOP, chess.BLACK):
-                    X[Const.X_black_bishops, i, j] = 1
-                elif piece == chess.Piece(chess.ROOK, chess.BLACK):
-                    X[Const.X_black_rooks, i, j] = 1
-                elif piece == chess.Piece(chess.QUEEN, chess.BLACK):
-                    X[Const.X_black_queens, i, j] = 1
-                elif piece == chess.Piece(chess.KING, chess.BLACK):
-                    X[Const.X_black_king, i, j] = 1
-                #else:
     return X

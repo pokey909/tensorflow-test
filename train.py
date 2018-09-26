@@ -47,22 +47,21 @@ def load_data(session, fq):
         'Y': tf.FixedLenFeature([], tf.string),
         'width': tf.FixedLenFeature([], tf.int64),
         'height': tf.FixedLenFeature([], tf.int64),
-        'planes': tf.FixedLenFeature([], tf.int64)
+        'planes': tf.FixedLenFeature([], tf.int64),
+        'fen': tf.FixedLenFeature([], tf.string)
     }              
     parsed = tf.parse_single_example(serialized_example, features=features)
     X = tf.decode_raw(parsed['X'], tf.int64)
     Y = tf.decode_raw(parsed['Y'], tf.int64)
+    fen = parsed['fen']
     # w, h, planes = sess.run([parsed['width'], parsed['height'], parsed['planes']])
 
     X = tf.reshape(X, [8, 8, 12])
     Y = tf.reshape(Y, [8, 8, 6])
 
-    X, Y = tf.train.shuffle_batch([X, Y], batch_size=10, capacity=30, num_threads=1, min_after_dequeue=10)
-    # X = tf.reshape(X, tf.stack([8,8,6]))
-    # X = tf.reshape(X, [8,8,12])
-    # Y = tf.reshape(Y, tf.stack([8,8,6]))
-    return X, Y
-
+    X, Y, FEN = tf.train.shuffle_batch([X, Y, fen], batch_size=10, capacity=30, num_threads=1, min_after_dequeue=10)
+    return X, Y, FEN
+    # return X,Y,fen
 
 config = tf.ConfigProto(
         device_count = {'GPU': 0}
@@ -71,7 +70,7 @@ with tf.Session(config=config)  as sess:
 
     filename = "bishop.tfrecord"
     filename_queue = tf.train.string_input_producer([filename], num_epochs=40)
-    x,y = load_data(sess, filename_queue)
+    x,y,fen = load_data(sess, filename_queue)
 
    # Initialize all global and local variables
     init_op = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
@@ -81,7 +80,7 @@ with tf.Session(config=config)  as sess:
     threads = tf.train.start_queue_runners(coord=coord)
     for ep in range(6):
         for batch_index in range(10):
-            X, Y = sess.run([x, y])
+            X, Y, FEN = sess.run([x, y, fen])
             Y = Y.astype(np.uint8)
             for j in range(18):
                 idx = (j % 6) + 1
@@ -90,13 +89,18 @@ with tf.Session(config=config)  as sess:
                 piece = chess.PIECE_NAMES[idx]
                 if j < 6:
                     plt.imshow(Y[batch_index, :,:,j].T)
+                    # plt.imshow(Y[:,:,j].T)
                 else:
                     plt.imshow(X[batch_index, :,:,j - 6].T, cmap='summer')
+                    # plt.imshow(X[:,:,j - 6].T, cmap='summer')
                 plt.xticks(np.arange(8), ('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'))
                 plt.yticks(np.arange(8), np.arange(1, 9))
                 plt.title(piece)
                 plt.gca().invert_yaxis()
+                plt.grid(True)
             plt.draw()
+            print(chess.Board(fen=FEN[batch_index].decode('utf-8')).unicode(invert_color=True, borders=False))
+            print("------------")
             plt.waitforbuttonpress(0)
     # Stop the threads
     coord.request_stop()
