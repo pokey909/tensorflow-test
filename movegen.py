@@ -26,13 +26,16 @@ def setupBoards(fen, pieceToMove):
     pgn = open('Ashley.pgn')
     
     initialBoards=[]
-    g = chess.pgn.read_game(pgn)
-    b = chess.Board()
-    initialBoards.append(chess.Board())
-    for move in g.main_line():
-        b.push(move)
-        # b.turn = pieceToMove.color
-        initialBoards.append(chess.Board(b.fen()))
+    while True:
+        g = chess.pgn.read_game(pgn)
+        if g == None:
+            break
+        b = chess.Board()
+        initialBoards.append(chess.Board())
+        for move in g.main_line():
+            b.push(move)
+            # b.turn = pieceToMove.color
+            initialBoards.append(chess.Board(b.fen()))
 
     # for game in initialBoards:
     #     if game == None:
@@ -80,7 +83,6 @@ def npy_to_tfrecords(x, y, boards, output_file):
 
         # Serialize the example to a string
         serialized = example.SerializeToString()
-
         # write the serialized objec to the disk
         writer.write(serialized)
     writer.close()
@@ -102,6 +104,7 @@ def allMovesForPiece(pieceToMove):
 
     positions = features[:, :, :, 0:(Const.X_black_king + 1)]
     moves = features[:,:,:,Const.X_white_pawns_moves:(Const.X_white_king_moves + 1)]
+    print("Written {:d} examples".format(features.shape[0]))
     npy_to_tfrecords(positions, moves, boards, chess.PIECE_NAMES[pieceToMove.piece_type] + ".tfrecord")
 
 for pt in chess.PIECE_TYPES:
