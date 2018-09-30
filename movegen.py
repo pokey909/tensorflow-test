@@ -21,7 +21,7 @@ def _bytes_feature(value):
 # def saveExample(features):
 #     X_flat = np.reshape(X, [X.shape[0], np.prod(X.shape[1:])])
 
-def setupBoards(fen, pieceToMove):
+def setupBoards(fen):
     boards = []
     pgn = open('Ashley.pgn')
     
@@ -34,32 +34,7 @@ def setupBoards(fen, pieceToMove):
         initialBoards.append(chess.Board())
         for move in g.main_line():
             b.push(move)
-            # b.turn = pieceToMove.color
             initialBoards.append(chess.Board(b.fen()))
-
-    # for game in initialBoards:
-    #     if game == None:
-    #         initialBoard = chess.Board(fen=fen, chess960=False)
-    #     else:
-    #         initialBoard = game
-    #     if len(pieceSquares) == 0:        
-    #         print(chess.PIECE_NAMES[pieceToMove.piece_type] + " not on the board. skipping position...")
-    #         # free = np.random.choice(list(~chess.SquareSet(initialBoard.occupied)))
-    #         # initialBoard.set_piece_at(free, pieceToMove)
-    #         # pieceSquares.add(free)
-
-    #     # print(pieceToMove)
-    #     # print(pieceSquares)
-    #     for pieceSquare in pieceSquares:
-    #         board = chess.Board(initialBoard.fen())
-    #         freeSquares = ~chess.SquareSet(board.occupied)
-    #         for i in freeSquares:
-    #             board = initialBoard
-    #             board.remove_piece_at(pieceSquare)
-    #             board.set_piece_at(i, pieceToMove)
-    #             board.turn = pieceToMove.color
-    #             boards.append(board)
-    # return boards
     return initialBoards
 
 def npy_to_tfrecords(x, y, boards, output_file):
@@ -87,15 +62,14 @@ def npy_to_tfrecords(x, y, boards, output_file):
         writer.write(serialized)
     writer.close()
 
-def allMovesForPiece(pieceToMove):
-    
-    boards = setupBoards(None, pieceToMove)
+def genTrainingData():
+    boards = setupBoards(None)
     features = None
     shapeKnown = False
     index = 0
     print("Extracting features...")
     for b in boards:
-        f = fe.extract_features(b)
+        f = fe.extract_features(b).astype(np.int16)
         if not shapeKnown:
             features = np.zeros(shape=(len(boards),) + f.shape, dtype=f.dtype)
             shapeKnown = True
@@ -104,8 +78,13 @@ def allMovesForPiece(pieceToMove):
 
     positions = features[:, :, :, 0:(Const.X_black_king + 1)]
     moves = features[:,:,:,Const.X_white_pawns_moves:(Const.X_white_king_moves + 1)]
-    print("Written {:d} examples".format(features.shape[0]))
-    npy_to_tfrecords(positions, moves, boards, chess.PIECE_NAMES[pieceToMove.piece_type] + ".tfrecord")
+    return positions, moves
 
+X,Y = genTrainingData()
+np.save('train_8x8x12.npy', X)
 for pt in chess.PIECE_TYPES:
-    allMovesForPiece(chess.Piece(pt, chess.WHITE))
+    piece = pt - 1
+    labelForPieceTensor = np.squeeze(Y[:,:,:,piece])
+    filename = 'label_8x8_' + chess.PIECE_NAMES[pt] + ".npy"
+    np.save(filename, labelForPieceTensor)
+    print("Written {:d} labels for {:s}".format(labelForPieceTensor.shape[0], chess.PIECE_NAMES[pt]))
