@@ -8,7 +8,7 @@ import keras.backend.tensorflow_backend as tfb
 POS_WEIGHT = 10  # multiplier for positive targets, needs to be tuned
 
 def load_data():
-    Yy = np.load('label_8x8_pawn.npy').astype(np.int16)
+    Yy = np.load('label_8x8_pawn.npy').astype(np.float32)
     Y = Yy.reshape(Yy.shape[0], -1)
     X = np.load('train_8x8x12.npy').astype(np.float32)
     print(X.shape)
@@ -80,24 +80,23 @@ def makeModel(X,Y):
     # model.add(keras.layers.MaxPooling2D((1, 1)))
     model.add(keras.layers.Flatten(input_shape=input_shape))
     model.add(keras.layers.Dense(8*8*12, activation='relu'))
-    model.add(keras.layers.Dense(600, activation='relu'))
-    model.add(keras.layers.Dense(8*8*12, activation='relu'))
-    model.add(keras.layers.Dense(600, activation='relu'))
-    model.add(keras.layers.Dense(8*8*12, activation='relu'))
-    model.add(keras.layers.Dense(64, activation='softmax'))
+    model.add(keras.layers.Dropout(0.25))
+    model.add(keras.layers.Dense(8*8, activation='relu'))
+    # model.add(keras.layers.Dropout(0.5))
+    model.add(keras.layers.Dense(64, activation='sigmoid'))
     print(model.output_shape)
-    model.compile(optimizer=keras.optimizers.RMSprop(),
+    model.compile(optimizer=keras.optimizers.Adam(lr=0.01, amsgrad=True, decay = 0.001),
                 loss='binary_crossentropy', #$categorical_crossentropy',
                 metrics=['accuracy'])
     return model
 
 
-config = tf.ConfigProto(device_count = {'GPU': 0})
+config = tf.ConfigProto(device_count = {'GPU': 1})
 callbacks = [
   # Interrupt training if `val_loss` stops improving for over 2 epochs
-  keras.callbacks.EarlyStopping(patience=200, monitor='acc'),
+  keras.callbacks.EarlyStopping(patience=50, monitor='acc', mode='max', min_delta=0.0001),
   # Write TensorBoard logs to `./logs` directory
-  keras.callbacks.TensorBoard(log_dir='./logs')
+  keras.callbacks.TensorBoard(log_dir='./logs/20')
 ]  
   
 with tf.Session(config=config)  as sess:
@@ -124,7 +123,7 @@ with tf.Session(config=config)  as sess:
     #     validation_steps=3
     #     )#, steps_per_epoch=30)
 
-    model.fit(x,y, epochs=3000, shuffle=False, batch_size=500, validation_data=(xval,yval), callbacks=callbacks)
-    model.evaluate(dataset, steps=30000)#, steps_per_epoch=30)
-
+    model.fit(x,y, epochs=3000, shuffle=True, batch_size=64, validation_data=(xval,yval), callbacks=callbacks)
+    print(model.evaluate(x,y, steps=300))#, steps_per_epoch=30)
+    model.predict_classes(xval, batch_size=32, verbose=1)
     sess.close()
